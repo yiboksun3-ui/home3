@@ -131,7 +131,7 @@ footer{background:linear-gradient(110deg,#174d2d,#246b3a);border-top:5px solid #
 <div class="field"><label id="loginIdLabel">번호 또는 이메일</label><input id="loginId" placeholder="예: 1 또는 student1@myclass.com"><div class="error" id="loginIdError"></div></div>
 <div class="field"><label>이름</label><input id="loginName" placeholder="이름을 입력해 주세요"><div class="error" id="loginNameError"></div></div>
 <div class="field"><label>비밀번호</label><input id="loginPass" type="password" placeholder="연습용 비밀번호"><div class="hint">수업용 계정만 사용하고 실제 비밀번호를 쓰지 마세요.</div><div class="error" id="loginPassError"></div></div>
-<button class="btn" style="width:100%" onclick="login()">로그인</button><p class="hint">데모 모드: 학생은 번호·이름, 선생님은 teacher·선생님으로 로그인할 수 있어요. Firebase 연결 후에는 이메일/비밀번호 계정을 사용하세요.</p></div></section>
+<button class="btn" style="width:100%" onclick="login()">로그인</button><button class="btn light" style="width:100%;margin-top:9px" onclick="loginAsDefaultTeacher()">교사용 기본 계정으로 바로 입장</button><p class="hint">교사용 기본 계정은 체험용 로컬 로그인입니다. 실제 Firebase 교사 계정 인증이나 보안 권한을 대신하지 않습니다.</p></div></section>
 
 <section class="page" id="page3"><div id="boardA"></div></section>
 <section class="page" id="page10"><div id="boardB"></div></section>
@@ -184,6 +184,24 @@ window.addEventListener("hashchange",renderRoute);document.getElementById("hamb"
 function isTeacher(){return user?.role==="teacher"}function logged(){return !!user}function canWrite(type){let p=state.settings.permissions?.[type]||"로그인한 사람";return p==="누구나"|| (p==="로그인한 사람"&&logged()) || (p==="선생님만"&&isTeacher())}
 function updateAuth(){let a=document.getElementById("authArea");a.innerHTML=user?`<span class="user-label">${esc(user.name)}님</span><button class="btn light" onclick="logout()">로그아웃</button>`:`<button class="btn light" onclick="go('page2')">로그인</button>`;document.querySelectorAll(".teacher-only").forEach(x=>x.style.display=isTeacher()?"inline-flex":"none")}
 function chooseRole(r){roleChoice=r;document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("active",b.dataset.role===r));document.getElementById("loginIdLabel").textContent=r==="teacher"?"선생님 이메일 또는 계정":"학생 번호 또는 이메일"}
+async function loginAsDefaultTeacher(){
+  // Firebase 익명 인증으로 실시간 공동 데이터에 접속합니다.
+  try{
+    if(db && fbAuth && fbFns && !fbAuth.currentUser){
+      await fbFns.signInAnonymously(fbAuth);
+    }
+    const uid=(fbAuth && fbAuth.currentUser)?fbAuth.currentUser.uid:"local-default-teacher";
+    user={uid,name:"선생님",role:"teacher",demo:true};
+    localStorage.setItem("schoolUser",JSON.stringify(user));
+    updateAuth();
+    toast("교사용 기본 계정으로 입장했어요.");
+    go("home");
+    renderAll();
+  }catch(e){
+    console.error("기본 교사 접속 실패",e);
+    toast("익명 인증을 사용할 수 없어요. Firebase 설정을 확인해 주세요.");
+  }
+}
 async function login(){let id=document.getElementById("loginId").value.trim(),name=document.getElementById("loginName").value.trim(),pass=document.getElementById("loginPass").value;["loginIdError","loginNameError","loginPassError"].forEach(x=>document.getElementById(x).textContent="");if(!id)document.getElementById("loginIdError").textContent="번호 또는 이메일을 입력해 주세요.";if(!name)document.getElementById("loginNameError").textContent="이름을 입력해 주세요.";if(!pass)document.getElementById("loginPassError").textContent="비밀번호를 입력해 주세요.";if(!id||!name||!pass)return;
 try{if(db&&fbAuth){let email=id.includes("@")?id:(roleChoice==="teacher"?"teacher":"student"+id)+"@myclass.com";await fbFns.signInWithEmailAndPassword(fbAuth,email,pass);let uid=fbAuth.currentUser.uid;let snap=await fbFns.getDoc(fbFns.doc(db,"users",uid));let profile=snap.exists()?snap.data():{name,role:roleChoice};user={uid,name:profile.name||name,role:profile.role||roleChoice};}else{user={uid:"local-"+id,name,role:roleChoice};}localStorage.setItem("schoolUser",JSON.stringify(user));toast("로그인했어요.");go("home");updateAuth();renderAll()}catch(e){document.getElementById("loginPassError").textContent="로그인 정보를 확인해 주세요. Firebase 계정이 없다면 먼저 계정을 만들어 주세요."}}
 async function logout(){if(fbAuth&&fbFns)try{await fbFns.signOut(fbAuth)}catch(e){}user=null;localStorage.removeItem("schoolUser");state.settings.adminUnlocked=false;updateAuth();toast("로그아웃했어요.");go("home")}
@@ -238,7 +256,13 @@ function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&l
 // Firebase 연결: 설정이 저장되어 있으면 modular SDK를 CDN에서 불러옵니다.
 // Firestore의 onSnapshot 구독을 사용하며, 로컬 데모 저장소와 별도로 동작합니다.
 async function initFirebase(){let cfg;try{cfg=JSON.parse(localStorage.getItem("schoolFirebaseConfig")||"null")}catch(e){}if(!cfg&&firebaseConfig.apiKey!=="여기에_붙여넣기"&&firebaseConfig.projectId)cfg=firebaseConfig;if(!cfg)return;
-try{const appMod=await import("https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"),authMod=await import("https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"),fsMod=await import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js");let app=appMod.initializeApp(cfg);fbAuth=authMod.getAuth(app);db=fsMod.getFirestore(app);fbFns={...authMod,...fsMod};document.getElementById("firebaseBanner").style.display="none";
+try{const appMod=await import("https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"),authMod=await import("https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"),fsMod=await import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js");let app=appMod.initializeApp(cfg);fbAuth=authMod.getAuth(app);db=fsMod.getFirestore(app);fbFns={...authMod,...fsMod};
+  // 별도 이메일/비밀번호 입력 없이 Firebase 익명 인증으로 실시간 반 전체 데이터에 연결
+  if(!fbAuth.currentUser) await authMod.signInAnonymously(fbAuth);
+  user={uid:fbAuth.currentUser.uid,name:"선생님",role:"teacher",demo:true};
+  localStorage.setItem("schoolUser",JSON.stringify(user));
+  updateAuth();
+  document.getElementById("firebaseBanner").style.display="none";
 const collections=["notices","posts","votes","timetable","events","points","notes","settings"];collections.forEach(name=>{fsMod.onSnapshot(fsMod.doc(db,"classroom",name),snap=>{if(snap.exists()){state[name]=snap.data().value;save();renderAll()}else fsMod.setDoc(fsMod.doc(db,"classroom",name),{value:state[name]})})});
 window.__syncClassroom=async()=>{for(let name of collections)await fsMod.setDoc(fsMod.doc(db,"classroom",name),{value:state[name]})};
 }catch(e){console.warn("Firebase 연결 실패",e);document.getElementById("firebaseBanner").style.display="flex";toast("Firebase 연결에 실패했어요. 설정과 보안 규칙을 확인해 주세요.")}}

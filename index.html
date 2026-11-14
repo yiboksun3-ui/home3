@@ -151,12 +151,13 @@ footer{background:linear-gradient(110deg,#174d2d,#246b3a);border-top:5px solid #
 // Firebase 콘솔의 프로젝트 설정 → 내 앱 → SDK 설정 및 구성에서 받은 값으로 채우세요.
 // 비워 두면 아래 앱은 localStorage 데모 모드로 동작합니다.
 const firebaseConfig = {
-  apiKey: "여기에_붙여넣기",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyBoFbtGb0pFtxkn8-xwzBhpKuJHMXs1a54",
+  authDomain: "home4-89dde.firebaseapp.com",
+  projectId: "home4-89dde",
+  storageBucket: "home4-89dde.firebasestorage.app",
+  messagingSenderId: "606744894837",
+  appId: "1:606744894837:web:35a200e780084fb920873c",
+  measurementId: "G-BE09ZK4SZ2"
 };
 
 const seed = {
@@ -173,7 +174,8 @@ const seed = {
  users:[],settings:{adminPassword:"0000",permissions:{posts:"로그인한 사람",votes:"로그인한 사람",notes:"누구나",teacher:"선생님만"},adminUnlocked:false}
 };
 let state=loadState(), user=JSON.parse(localStorage.getItem("schoolUser")||"null"), roleChoice="student",noticeIndex=0,calendarMonth=new Date(2026,10,1),selectedDay=null,boardPage={page3:1,page10:1},activePost=null,editingPost=null,db=null,fbAuth=null,fbFns=null;
-function loadState(){try{return {...structuredClone(seed),...JSON.parse(localStorage.getItem("schoolDemocracyData")||"{}")}}catch(e){return structuredClone(seed)}}
+function cloneData(value){return (typeof structuredClone==="function")?structuredClone(value):JSON.parse(JSON.stringify(value))}
+function loadState(){try{return {...cloneData(seed),...JSON.parse(localStorage.getItem("schoolDemocracyData")||"{}")}}catch(e){return cloneData(seed)}}
 function save(){localStorage.setItem("schoolDemocracyData",JSON.stringify(state));}
 function toast(msg){let t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2400)}
 function go(id){if(id==="page7"&&!state.settings.adminUnlocked&&!isTeacher()){adminLock();return}location.hash=id;document.getElementById("nav").classList.remove("open")}
